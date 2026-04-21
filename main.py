@@ -7,11 +7,10 @@ from typing import Any, Optional
 import httpx
 from anthropic import Anthropic
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
-from starlette.routing import Mount, Route
 
 load_dotenv()
 
@@ -328,51 +327,49 @@ async def brief(body: QueryBody) -> dict[str, Any]:
     return await _do_brief(body.query, body.system)
 
 
-# ---------------- MCP SSE endpoint (Claude.ai Connectors) ----------------
-from mcp.server import Server  # noqa: E402
-from mcp.server.sse import SseServerTransport  # noqa: E402
-from mcp.types import TextContent, Tool  # noqa: E402
-
-mcp_server: Server = Server("tstv-ResearchMan")
+# ---------------- MCP endpoint (pure FastAPI, JSON-RPC 2.0) ----------------
+_MCP_PROTOCOL_VERSION = "2024-11-05"
+_MCP_SERVER_INFO = {"name": "tstv-ResearchMan", "version": "1.0.0"}
 
 _TOOL_INPUT_SCHEMA = {
     "type": "object",
-    "properties": {"query": {"type": "string", "description": "질문 또는 리서치 주제"}},
+    "properties": {
+        "query": {"type": "string", "description": "질문 또는 리서치 주제"}
+    },
     "required": ["query"],
 }
 
-
-@mcp_server.list_tools()
-async def _mcp_list_tools() -> list[Tool]:
-    return [
-        Tool(
-            name="리서치맨_조사",
-            description="Perplexity sonar-pro 기반 팩트 조사 (원문 인용, citations 포함)",
-            inputSchema=_TOOL_INPUT_SCHEMA,
-        ),
-        Tool(
-            name="리서치맨_분석",
-            description="Gemini 2.5 Pro 기반 심층 분석. query 안의 PDF/YouTube URL 자동 인식, 없으면 Google Search grounding.",
-            inputSchema=_TOOL_INPUT_SCHEMA,
-        ),
-        Tool(
-            name="리서치맨_브리핑",
-            description="Claude Sonnet 4.6 + web_search 기반 전략 브리핑 (한화로보틱스 기획팀 페르소나).",
-            inputSchema=_TOOL_INPUT_SCHEMA,
-        ),
-        Tool(
-            name="리서치맨_풀리서치",
-            description="Perplexity + Gemini 병렬 실행 후 Claude가 취합/브리핑.",
-            inputSchema=_TOOL_INPUT_SCHEMA,
-        ),
-    ]
+_MCP_TOOLS = [
+    {
+        "name": "리서치맨_조사",
+        "description": "Perplexity sonar-pro 기반 팩트 조사 (원문 인용, citations 포함)",
+        "inputSchema": _TOOL_INPUT_SCHEMA,
+    },
+    {
+        "name": "리서치맨_분석",
+        "description": "Gemini 2.5 Pro 기반 심층 분석. query 안의 PDF/YouTube URL 자동 인식, 없으면 Google Search grounding.",
+        "inputSchema": _TOOL_INPUT_SCHEMA,
+    },
+    {
+        "name": "리서치맨_브리핑",
+        "description": "Claude Sonnet 4.6 + web_search 기반 전략 브리핑 (한화로보틱스 기획팀 페르소나).",
+        "inputSchema": _TOOL_INPUT_SCHEMA,
+    },
+    {
+        "name": "리서치맨_풀리서치",
+        "description": "Perplexity + Gemini 병렬 실행 후 Claude가 취합/브리핑.",
+        "inputSchema": _TOOL_INPUT_SCHEMA,
+    },
+]
 
 
-@mcp_server.call_tool()
-async def _mcp_call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+async def _mcp_call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     query = (arguments or {}).get("query", "")
     if not query:
-        return [TextContent(type="text", text="error: 'query' is required")]
+        return {
+            "content": [{"type": "text", "text": "error: 'query' is required"}],
+            "isError": True,
+        }
 
     if name == "리서치맨_조사":
         res = await _do_research(query, None, None)
@@ -383,31 +380,123 @@ async def _mcp_call_tool(name: str, arguments: dict[str, Any]) -> list[TextConte
     elif name == "리서치맨_풀리서치":
         res = await _do_full_research(query)
     else:
-        return [TextContent(type="text", text=f"error: unknown tool '{name}'")]
+        return {
+            "content": [{"type": "text", "text": f"error: unknown tool '{name}'"}],
+            "isError": True,
+        }
 
     text = res.get("result", "") or ""
     citations = res.get("citations", []) or []
     if citations:
         text += "\n\n[Citations]\n" + "\n".join(f"- {c}" for c in citations)
-    return [TextContent(type="text", text=text)]
+    return {"content": [{"type": "text", "text": text}]}
 
 
-_sse_transport = SseServerTransport("/mcp/messages/")
+async def _mcp_handle_rpc(payload: dict[str, Any]) -> Optional[dict[str, Any]]:
+    method = payload.get("method")
+    req_id = payload.get("id")
+    params = payload.get("params") or {}
+    is_notification = "id" not in payload
+
+    def ok(result: Any) -> dict[str, Any]:
+        return {"jsonrpc": "2.0", "id": req_id, "result": result}
+
+    def err(code: int, msg: str) -> dict[str, Any]:
+        return {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": msg}}
+
+    try:
+        if method == "initialize":
+            return ok(
+                {
+                    "protocolVersion": _MCP_PROTOCOL_VERSION,
+                    "capabilities": {"tools": {}},
+                    "serverInfo": _MCP_SERVER_INFO,
+                }
+            )
+        if method in ("notifications/initialized", "initialized"):
+            return None
+        if method == "tools/list":
+            return ok({"tools": _MCP_TOOLS})
+        if method == "tools/call":
+            tool_name = params.get("name", "")
+            arguments = params.get("arguments") or {}
+            result = await _mcp_call_tool(tool_name, arguments)
+            return ok(result)
+        if method == "ping":
+            return ok({})
+        if is_notification:
+            return None
+        return err(-32601, f"Method not found: {method}")
+    except HTTPException as e:
+        return err(-32000, str(e.detail))
+    except Exception as e:
+        return err(-32000, str(e))
 
 
-async def _mcp_sse_handler(request: Request):
+def _check_mcp_auth(request: Request) -> None:
     provided = request.headers.get("x-api-key") or request.query_params.get("api_key")
     if not MCP_API_KEY or provided != MCP_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
-    async with _sse_transport.connect_sse(
-        request.scope, request.receive, request._send
-    ) as (read_stream, write_stream):
-        await mcp_server.run(
-            read_stream,
-            write_stream,
-            mcp_server.create_initialization_options(),
+
+
+@app.post("/mcp")
+async def mcp_post(request: Request):
+    _check_mcp_auth(request)
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}},
+            status_code=400,
         )
 
+    if isinstance(payload, list):
+        responses: list[dict[str, Any]] = []
+        for item in payload:
+            if isinstance(item, dict):
+                r = await _mcp_handle_rpc(item)
+                if r is not None:
+                    responses.append(r)
+        if not responses:
+            return Response(status_code=202)
+        return JSONResponse(responses)
 
-app.router.routes.append(Route("/mcp", endpoint=_mcp_sse_handler, methods=["GET"]))
-app.router.routes.append(Mount("/mcp/messages/", app=_sse_transport.handle_post_message))
+    if not isinstance(payload, dict):
+        return JSONResponse(
+            {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Invalid Request"}},
+            status_code=400,
+        )
+
+    response = await _mcp_handle_rpc(payload)
+    if response is None:
+        return Response(status_code=202)
+    return JSONResponse(response)
+
+
+@app.get("/mcp")
+async def mcp_sse(request: Request):
+    _check_mcp_auth(request)
+
+    api_key = request.query_params.get("api_key", "")
+    post_endpoint = "/mcp" + (f"?api_key={api_key}" if api_key else "")
+
+    async def event_stream():
+        yield f"event: endpoint\ndata: {post_endpoint}\n\n".encode("utf-8")
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                await asyncio.sleep(15)
+                yield b": keep-alive\n\n"
+        except asyncio.CancelledError:
+            return
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

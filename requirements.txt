@@ -3,4 +3,3 @@ uvicorn
 httpx
 anthropic
 python-dotenv
-mcp
