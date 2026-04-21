@@ -396,9 +396,9 @@ _sse_transport = SseServerTransport("/mcp/messages/")
 
 
 async def _mcp_sse_handler(request: Request):
-    provided = request.headers.get("x-api-key")
+    provided = request.headers.get("x-api-key") or request.query_params.get("api_key")
     if not MCP_API_KEY or provided != MCP_API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid or missing X-API-Key")
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
     async with _sse_transport.connect_sse(
         request.scope, request.receive, request._send
     ) as (read_stream, write_stream):
