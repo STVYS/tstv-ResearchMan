@@ -341,22 +341,22 @@ _TOOL_INPUT_SCHEMA = {
 
 _MCP_TOOLS = [
     {
-        "name": "리서치맨_조사",
+        "name": "research_man_search",
         "description": "Perplexity sonar-pro 기반 팩트 조사 (원문 인용, citations 포함)",
         "inputSchema": _TOOL_INPUT_SCHEMA,
     },
     {
-        "name": "리서치맨_분석",
+        "name": "research_man_analyze",
         "description": "Gemini 2.5 Pro 기반 심층 분석. query 안의 PDF/YouTube URL 자동 인식, 없으면 Google Search grounding.",
         "inputSchema": _TOOL_INPUT_SCHEMA,
     },
     {
-        "name": "리서치맨_브리핑",
+        "name": "research_man_brief",
         "description": "Claude Sonnet 4.6 + web_search 기반 전략 브리핑 (한화로보틱스 기획팀 페르소나).",
         "inputSchema": _TOOL_INPUT_SCHEMA,
     },
     {
-        "name": "리서치맨_풀리서치",
+        "name": "research_man_full",
         "description": "Perplexity + Gemini 병렬 실행 후 Claude가 취합/브리핑.",
         "inputSchema": _TOOL_INPUT_SCHEMA,
     },
@@ -371,13 +371,13 @@ async def _mcp_call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]
             "isError": True,
         }
 
-    if name == "리서치맨_조사":
+    if name == "research_man_search":
         res = await _do_research(query, None, None)
-    elif name == "리서치맨_분석":
+    elif name == "research_man_analyze":
         res = await _do_analyze(query, None, None)
-    elif name == "리서치맨_브리핑":
+    elif name == "research_man_brief":
         res = await _do_brief(query, None)
-    elif name == "리서치맨_풀리서치":
+    elif name == "research_man_full":
         res = await _do_full_research(query)
     else:
         return {
