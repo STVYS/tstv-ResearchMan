@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>리서치맨</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0A0A0C; --card:#111114; --border:#1E1E22;
+  --text:#D8D5CC; --dim:#555; --gold:#C8A96E;
+  --green:#00C9A7; --blue:#4285F4; --red:#E05C5C;
+}
+* { box-sizing: border-box; }
+body {
+  margin:0; background: var(--bg); color: var(--text);
+  font-family: 'IBM Plex Mono','Courier New',monospace;
+  font-size:13px; min-height:100vh;
+}
+.container { max-width:720px; margin:0 auto; padding:20px; }
+.header { border-bottom:1px solid var(--border); padding-bottom:14px; margin-bottom:20px; }
+.header-label { font-size:10px; letter-spacing:0.2em; color:#444; margin-bottom:4px; }
+.header-title { font-size:16px; font-weight:700; }
+
+.section { margin-bottom:18px; }
+.section-title { font-size:10px; letter-spacing:0.18em; color:#444; margin-bottom:10px; display:flex; gap:8px; align-items:center; }
+.section-title.green { color: var(--green); }
+.section-title.blue { color: var(--blue); }
+.section-title .note { color: var(--gold); font-size:9px; }
+
+input[type="text"], textarea {
+  width:100%; background:var(--bg); border:1px solid #2A2A2E; border-radius:4px;
+  padding:8px 12px; color:var(--text); font-size:12px; font-family:inherit; outline:none;
+}
+textarea { resize:vertical; }
+
+.row { display:flex; flex-wrap:wrap; gap:6px; }
+.tag {
+  padding:5px 11px; border-radius:4px; cursor:pointer;
+  font-family:inherit; font-size:12px; white-space:nowrap; transition:all 0.15s;
+  border:1px solid #2A2A2E; background:transparent; color:var(--dim);
+}
+.tag.active { border-color:var(--gold); background:rgba(200,169,110,0.09); color:var(--gold); }
+
+.mbtn {
+  padding:7px 11px; border-radius:4px; cursor:pointer;
+  font-family:inherit; font-size:11px; transition:all 0.15s; text-align:left;
+  border:1px solid #2A2A2E; background:transparent; color:var(--dim);
+}
+.mbtn.active-green { border-color:var(--green); background:rgba(0,201,167,0.09); color:var(--green); }
+.mbtn.active-blue  { border-color:var(--blue);  background:rgba(66,133,244,0.09); color:var(--blue); }
+.mbtn-desc { font-size:9px; color:#444; margin-top:1px; }
+
+.focus-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.focus-btn {
+  padding:9px 12px; text-align:left; border-radius:4px; cursor:pointer;
+  font-family:inherit; transition:all 0.15s;
+  background:var(--card); border:1px solid var(--border); color:#888;
+}
+.focus-btn.active { background:rgba(200,169,110,0.06); border-color:rgba(200,169,110,0.31); }
+.focus-btn .focus-id { font-size:12px; margin-bottom:2px; }
+.focus-btn.active .focus-id { color: var(--gold); }
+.focus-btn .focus-desc { font-size:10px; color:#444; }
+
+.submit {
+  width:100%; padding:13px; background:#1A1A1E; color:#444;
+  border:none; border-radius:6px; font-size:13px; font-weight:700;
+  cursor:not-allowed; font-family:inherit; transition:all 0.2s; opacity:0.5;
+}
+.submit.enabled { background:var(--gold); color:var(--bg); cursor:pointer; opacity:1; }
+
+.hint { font-size:11px; color:var(--dim); text-align:center; margin-top:8px; }
+.find-hint { font-size:10px; color:var(--gold); margin-top:5px; }
+.hidden { display:none !important; }
+
+.running-panel { margin-top:20px; }
+.task-row {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:10px 14px; background:var(--card); border:1px solid var(--border);
+  border-radius:4px; margin-bottom:6px; font-size:12px;
+}
+.task-label { color: var(--dim); }
+.task-timer { color: var(--gold); font-variant-numeric:tabular-nums; }
+.task-row.done .task-timer { color: var(--green); }
+
+.result-panel { margin-top:20px; }
+.result-actions { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+.action-btn {
+  padding:7px 14px; background:transparent; border:1px solid var(--border); border-radius:4px;
+  color:var(--dim); font-size:11px; cursor:pointer; font-family:inherit; transition:all 0.15s;
+}
+.action-btn:hover { color:var(--gold); border-color:var(--gold); }
+
+.result-section { margin-bottom:20px; }
+.result-section-title { font-size:10px; letter-spacing:0.18em; color:var(--dim); margin-bottom:8px; }
+.result-body {
+  background:var(--card); border:1px solid var(--border); border-radius:4px;
+  padding:14px; font-size:12px; line-height:1.7; white-space:pre-wrap; word-wrap:break-word;
+}
+
+details { margin-top:12px; }
+details summary {
+  cursor:pointer; font-size:11px; color:var(--dim); padding:6px 0;
+  list-style:none;
+}
+details summary::-webkit-details-marker { display:none; }
+details summary:hover { color:var(--gold); }
+details summary::before { content:"▸ "; }
+details[open] summary::before { content:"▾ "; }
+
+.citations { margin-top:10px; font-size:10px; color:var(--dim); line-height:1.8; }
+.citations a { color:var(--dim); word-break:break-all; text-decoration:none; }
+.citations a:hover { color:var(--gold); }
+
+.error {
+  background:rgba(224,92,92,0.08); border:1px solid rgba(224,92,92,0.3);
+  border-radius:4px; padding:12px; color:var(--red); font-size:12px; margin-top:12px;
+  white-space:pre-wrap;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="header-label">HANWHA ROBOTICS — PARTNERSHIP INTEL</div>
+    <div class="header-title">리서치맨 조사 설정</div>
+  </div>
+
+  <div id="form">
+    <div class="section">
+      <div class="section-title">업체명 <span class="note">비우면 탐색 모드</span></div>
+      <input type="text" id="company" placeholder="예: Physical Intelligence (비우면 업체 탐색)">
+      <div id="findHint" class="find-hint">탐색 모드: 지역·규모 선택 필수</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">지역</div>
+      <div class="row" id="regionRow"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">산업 (복수 선택)</div>
+      <div class="row" id="industryRow"></div>
+      <input type="text" id="otherIndustry" placeholder="산업 직접 입력" class="hidden" style="margin-top:8px;">
+    </div>
+
+    <div class="section">
+      <div class="section-title">업체 규모 <span class="note" id="sizeNote"></span></div>
+      <div class="row" id="sizeRow"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">조사 목적</div>
+      <div class="row" id="purposeRow"></div>
+      <input type="text" id="otherPurpose" placeholder="목적 직접 입력" class="hidden" style="margin-top:8px;">
+    </div>
+
+    <div class="section hidden" id="meetingSection">
+      <div class="section-title">미팅 컨텍스트 <span class="note">주제 필수</span></div>
+      <input type="text" id="meetingTopic" placeholder="미팅 주제 (필수)" style="margin-bottom:8px;">
+      <textarea id="meetingComment" placeholder="우리 목적 / 사전 코멘트" rows="2"></textarea>
+    </div>
+
+    <div class="section">
+      <div class="section-title">조사 초점 (복수 선택)</div>
+      <div class="focus-grid" id="focusGrid"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title green">PERPLEXITY 모델</div>
+      <div class="row" id="pModelRow"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title blue">GEMINI 모델</div>
+      <div class="row" id="gModelRow"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">기타 요청 (선택)</div>
+      <textarea id="extraRequest" placeholder="예: 한국 대리점 현황도 포함 / 창업자 X의 특허 이력 집중 분석" rows="3"></textarea>
+    </div>
+
+    <button class="submit" id="submitBtn">업체 탐색 시작</button>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <div id="running" class="running-panel hidden">
+    <div class="task-row" id="taskResearch">
+      <div class="task-label">Perplexity 조사</div>
+      <div class="task-timer">0.0s</div>
+    </div>
+    <div class="task-row" id="taskAnalyze">
+      <div class="task-label">Gemini 분석</div>
+      <div class="task-timer">0.0s</div>
+    </div>
+    <div class="task-row" id="taskBrief">
+      <div class="task-label">Claude 브리핑</div>
+      <div class="task-timer">—</div>
+    </div>
+  </div>
+
+  <div id="result" class="result-panel hidden">
+    <div class="result-actions">
+      <button class="action-btn" id="copyBtn">전체 복사</button>
+      <button class="action-btn" id="downloadBtn">MD 다운로드</button>
+      <button class="action-btn" id="resetBtn">다시 조사</button>
+    </div>
+    <div class="result-section">
+      <div class="result-section-title">최종 브리핑 (Claude)</div>
+      <div class="result-body" id="briefBody"></div>
+      <div class="citations" id="briefCitations"></div>
+    </div>
+    <details>
+      <summary>Perplexity 조사 원본</summary>
+      <div class="result-body" id="researchBody" style="margin-top:8px;"></div>
+      <div class="citations" id="researchCitations"></div>
+    </details>
+    <details>
+      <summary>Gemini 분석 원본</summary>
+      <div class="result-body" id="analyzeBody" style="margin-top:8px;"></div>
+      <div class="citations" id="analyzeCitations"></div>
+    </details>
+  </div>
+
+  <div id="errorBox"></div>
+</div>
+
+<script>
+const INDUSTRIES = [
+  "Physical AI / Robot Foundation Model", "협동로봇 (Cobot)", "텔레오퍼레이션 / 원격조작",
+  "산업용 로봇 (용접·핸들링·조립)", "휴머노이드", "AMR / 물류 자동화",
+  "로봇 소프트웨어 / 시뮬레이션", "비전·센싱 (3D비전·LiDAR)",
+  "그리퍼 / 엔드이펙터", "모터·액추에이터",
+];
+const FOCUS_OPTIONS = [
+  { id: "기업 일반",        desc: "설립·지분·재무·매출" },
+  { id: "최근 업력",        desc: "최근 12개월 뉴스·수주·발표" },
+  { id: "기술 수준",        desc: "제품·특허·TRL" },
+  { id: "구성원 프로파일",  desc: "CEO·CTO·핵심 인력" },
+  { id: "논문·연구 방향",   desc: "기술 지향점·저자 분석" },
+  { id: "채용 현황",        desc: "포지션으로 R&D 방향 추론" },
+  { id: "경쟁·시장 포지션", desc: "경쟁사 대비 위치" },
+  { id: "리스크 신호",      desc: "임원 이탈·소송·재무 이상" },
+];
+const P_MODELS = [
+  { id: "sonar",               d: "빠름·저렴" },
+  { id: "sonar-pro",           d: "기본값·출처 2배" },
+  { id: "sonar-deep-research", d: "초심층 (10~30분)" },
+];
+const G_MODELS = [
+  { id: "gemini-2.5-flash", d: "빠름" },
+  { id: "gemini-2.5-pro",   d: "기본값·멀티모달·문서 분석" },
+];
+
+const state = {
+  company: "", region: [], industries: [], size: null,
+  purpose: null, focus: [],
+  pModel: "sonar-pro", gModel: "gemini-2.5-pro",
+  meetingTopic: "", meetingComment: "", extraRequest: "",
+  otherIndustry: "", otherPurpose: "",
+};
+let lastResult = null;
+
+const $ = id => document.getElementById(id);
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" })[c]);
+const tog = (arr, v) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v];
+const isFindMode = () => state.company.trim() === "";
+
+function canRunCheck() {
+  const step1 = state.industries.length > 0 && (!state.industries.includes("기타") || state.otherIndustry.trim().length > 0);
+  const step2 = state.purpose !== null && (state.purpose !== "기타" || state.otherPurpose.trim().length > 0);
+  const step3 = state.focus.length > 0;
+  const step4 = isFindMode() ? (state.size !== null && state.region.length > 0) : true;
+  const step5 = state.purpose !== "미팅 준비" || state.meetingTopic.trim().length > 0;
+  const hint =
+    !step1 ? (!state.industries.length ? "산업 선택 필요" : "산업 기타 입력 필요") :
+    !step2 ? (!state.purpose ? "조사 목적 선택 필요" : "목적 기타 입력 필요") :
+    !step3 ? "조사 초점 선택 필요" :
+    !step4 ? (isFindMode() && !state.region.length ? "탐색 모드: 지역 선택 필요" : "탐색 모드: 규모 선택 필요") :
+    !step5 ? "미팅 주제 입력 필요" : "";
+  return { can: step1 && step2 && step3 && step4 && step5, hint };
+}
+
+function updateCanRun() {
+  const { can, hint } = canRunCheck();
+  const btn = $("submitBtn");
+  btn.className = "submit" + (can ? " enabled" : "");
+  btn.disabled = !can;
+  btn.textContent = state.company.trim() ? "심층 조사 시작" : "업체 탐색 시작";
+  $("hint").textContent = hint;
+  $("findHint").style.display = isFindMode() ? "block" : "none";
+  $("sizeNote").textContent = isFindMode() ? "탐색 모드 필수" : "";
+}
+
+function renderTags(containerId, items, isActive, onClick) {
+  const c = $(containerId);
+  c.innerHTML = "";
+  items.forEach(v => {
+    const btn = document.createElement("button");
+    btn.className = "tag" + (isActive(v) ? " active" : "");
+    btn.textContent = v;
+    btn.addEventListener("click", () => onClick(v));
+    c.appendChild(btn);
+  });
+}
+
+function renderRegion() {
+  renderTags("regionRow", ["국내","해외"],
+    v => state.region.includes(v),
+    v => { state.region = tog(state.region, v); renderRegion(); updateCanRun(); });
+}
+function renderIndustries() {
+  renderTags("industryRow", [...INDUSTRIES, "기타"],
+    v => state.industries.includes(v),
+    v => {
+      state.industries = tog(state.industries, v);
+      renderIndustries();
+      $("otherIndustry").className = state.industries.includes("기타") ? "" : "hidden";
+      updateCanRun();
+    });
+}
+function renderSize() {
+  renderTags("sizeRow", ["스타트업","중소형","대형 (ABB·FANUC급)"],
+    v => state.size === v,
+    v => { state.size = state.size === v ? null : v; renderSize(); updateCanRun(); });
+}
+function renderPurpose() {
+  renderTags("purposeRow", ["시장조사","미팅 준비","협업 검토","기타"],
+    v => state.purpose === v,
+    v => {
+      state.purpose = state.purpose === v ? null : v;
+      renderPurpose();
+      $("otherPurpose").className = state.purpose === "기타" ? "" : "hidden";
+      $("meetingSection").className = "section" + (state.purpose === "미팅 준비" ? "" : " hidden");
+      updateCanRun();
+    });
+}
+function renderFocus() {
+  const c = $("focusGrid");
+  c.innerHTML = "";
+  FOCUS_OPTIONS.forEach(f => {
+    const btn = document.createElement("button");
+    btn.className = "focus-btn" + (state.focus.includes(f.id) ? " active" : "");
+    btn.innerHTML = `<div class="focus-id">${escapeHtml(f.id)}</div><div class="focus-desc">${escapeHtml(f.desc)}</div>`;
+    btn.addEventListener("click", () => {
+      state.focus = tog(state.focus, f.id);
+      renderFocus();
+      updateCanRun();
+    });
+    c.appendChild(btn);
+  });
+}
+function renderModelRow(containerId, items, selected, activeCls, onClick) {
+  const c = $(containerId);
+  c.innerHTML = "";
+  items.forEach(it => {
+    const btn = document.createElement("button");
+    btn.className = "mbtn" + (selected === it.id ? " " + activeCls : "");
+    const label = it.id.replace("gemini-", "");
+    btn.innerHTML = `<div>${escapeHtml(label)}</div><div class="mbtn-desc">${escapeHtml(it.d)}</div>`;
+    btn.addEventListener("click", () => onClick(it.id));
+    c.appendChild(btn);
+  });
+}
+function renderPModel() {
+  renderModelRow("pModelRow", P_MODELS, state.pModel, "active-green",
+    id => { state.pModel = id; renderPModel(); });
+}
+function renderGModel() {
+  renderModelRow("gModelRow", G_MODELS, state.gModel, "active-blue",
+    id => { state.gModel = id; renderGModel(); });
+}
+
+function buildQueryText() {
+  const effInd = state.industries.map(i => i === "기타" ? state.otherIndustry.trim() : i).filter(Boolean);
+  const effPurpose = state.purpose === "기타" ? state.otherPurpose.trim() : state.purpose;
+  const lines = [
+    `조사 대상: ${state.company.trim() || "(탐색 모드 — 조건에 맞는 업체 탐색)"}`,
+    `지역: ${state.region.length ? state.region.join("·") : "전체"}`,
+    `산업: ${effInd.join(", ")}`,
+    `규모: ${state.size || "전체"}`,
+    `목적: ${effPurpose}`,
+    `초점: ${state.focus.join(", ")}`,
+  ];
+  if (state.purpose === "미팅 준비") {
+    lines.push(`미팅 주제: ${state.meetingTopic}`);
+    lines.push(`우리 목적: ${state.meetingComment || "(미입력)"}`);
+  }
+  if (state.extraRequest.trim()) lines.push(`기타 요청: ${state.extraRequest.trim()}`);
+  return lines.join("\n");
+}
+
+function formatCitations(cites) {
+  if (!cites || !cites.length) return "";
+  return cites.map(c => {
+    if (typeof c === "string") {
+      return `<div><a href="${escapeHtml(c)}" target="_blank" rel="noopener">${escapeHtml(c)}</a></div>`;
+    }
+    const url = c.url || c.uri || "";
+    const title = c.title || url;
+    if (!url) return "";
+    return `<div><a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(title)}</a></div>`;
+  }).join("");
+}
+
+async function postJSON(path, body) {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) {
+    throw new Error(data.detail || data.error || `HTTP ${res.status}`);
+  }
+  return data;
+}
+
+async function onSubmit() {
+  const { can } = canRunCheck();
+  if (!can) return;
+
+  $("form").classList.add("hidden");
+  $("running").classList.remove("hidden");
+  $("result").classList.add("hidden");
+  $("errorBox").innerHTML = "";
+
+  const queryText = buildQueryText();
+  const rTimer = $("taskResearch").querySelector(".task-timer");
+  const aTimer = $("taskAnalyze").querySelector(".task-timer");
+  const bTimer = $("taskBrief").querySelector(".task-timer");
+  rTimer.textContent = "0.0s"; aTimer.textContent = "0.0s"; bTimer.textContent = "—";
+  $("taskResearch").classList.remove("done");
+  $("taskAnalyze").classList.remove("done");
+  $("taskBrief").classList.remove("done");
+
+  const start = Date.now();
+  let researchDone = false, analyzeDone = false;
+  const tickId = setInterval(() => {
+    const e = (Date.now() - start) / 1000;
+    if (!researchDone) rTimer.textContent = e.toFixed(1) + "s";
+    if (!analyzeDone)  aTimer.textContent = e.toFixed(1) + "s";
+  }, 100);
+
+  try {
+    const researchP = postJSON("/research", { query: queryText, model: state.pModel })
+      .then(r => { researchDone = true; $("taskResearch").classList.add("done"); rTimer.textContent = (r.elapsed || 0).toFixed(1) + "s"; return r; });
+    const analyzeP = postJSON("/analyze", { query: queryText, model: state.gModel })
+      .then(r => { analyzeDone = true; $("taskAnalyze").classList.add("done"); aTimer.textContent = (r.elapsed || 0).toFixed(1) + "s"; return r; });
+
+    const [rRes, aRes] = await Promise.all([researchP, analyzeP]);
+    clearInterval(tickId);
+
+    const briefStart = Date.now();
+    const briefTick = setInterval(() => {
+      bTimer.textContent = ((Date.now() - briefStart) / 1000).toFixed(1) + "s";
+    }, 100);
+
+    const combined =
+      `[원본 조사 조건]\n${queryText}\n\n` +
+      `[Perplexity 조사 결과]\n${rRes.result || ""}\n\n` +
+      `[Gemini 분석 결과]\n${aRes.result || ""}\n\n` +
+      `위 두 결과를 취합해 한화로보틱스 기획팀 관점에서 ` +
+      `팩트 기반·원문 인용·출처 URL 포함 브리핑. 충돌/공백/핵심 인사이트 정리, ` +
+      `미확인 정보는 "미확인" 표기.`;
+
+    const bRes = await postJSON("/brief", { query: combined });
+    clearInterval(briefTick);
+    bTimer.textContent = (bRes.elapsed || 0).toFixed(1) + "s";
+    $("taskBrief").classList.add("done");
+
+    showResult(queryText, rRes, aRes, bRes);
+  } catch (err) {
+    clearInterval(tickId);
+    $("running").classList.add("hidden");
+    $("form").classList.remove("hidden");
+    $("errorBox").innerHTML = `<div class="error">에러: ${escapeHtml(err.message || String(err))}</div>`;
+  }
+}
+
+function showResult(queryText, r, a, b) {
+  lastResult = { queryText, r, a, b };
+  $("running").classList.add("hidden");
+  $("result").classList.remove("hidden");
+  $("briefBody").textContent = b.result || "";
+  $("briefCitations").innerHTML = formatCitations(b.citations);
+  $("researchBody").textContent = r.result || "";
+  $("researchCitations").innerHTML = formatCitations(r.citations);
+  $("analyzeBody").textContent = a.result || "";
+  $("analyzeCitations").innerHTML = formatCitations(a.citations);
+}
+
+function citationsToMd(cites) {
+  if (!cites || !cites.length) return "";
+  const lines = cites.map(c => {
+    if (typeof c === "string") return `- ${c}`;
+    const url = c.url || c.uri || "";
+    const title = c.title || url;
+    return url ? `- [${title}](${url})` : `- ${title}`;
+  });
+  return "\n### 출처\n" + lines.join("\n") + "\n";
+}
+
+function buildMarkdown() {
+  if (!lastResult) return "";
+  const { queryText, r, a, b } = lastResult;
+  return (
+`# 리서치맨 조사 결과
+
+## 조사 조건
+\`\`\`
+${queryText}
+\`\`\`
+
+## 최종 브리핑 (Claude)
+${b.result || ""}
+${citationsToMd(b.citations)}
+## Perplexity 조사 원본
+${r.result || ""}
+${citationsToMd(r.citations)}
+## Gemini 분석 원본
+${a.result || ""}
+${citationsToMd(a.citations)}`
+  );
+}
+
+function init() {
+  $("company").addEventListener("input", e => { state.company = e.target.value; updateCanRun(); });
+  $("otherIndustry").addEventListener("input", e => { state.otherIndustry = e.target.value; updateCanRun(); });
+  $("otherPurpose").addEventListener("input", e => { state.otherPurpose = e.target.value; updateCanRun(); });
+  $("meetingTopic").addEventListener("input", e => { state.meetingTopic = e.target.value; updateCanRun(); });
+  $("meetingComment").addEventListener("input", e => { state.meetingComment = e.target.value; });
+  $("extraRequest").addEventListener("input", e => { state.extraRequest = e.target.value; });
+
+  renderRegion(); renderIndustries(); renderSize(); renderPurpose();
+  renderFocus(); renderPModel(); renderGModel();
+
+  $("submitBtn").addEventListener("click", onSubmit);
+  $("copyBtn").addEventListener("click", () => {
+    navigator.clipboard.writeText(buildMarkdown()).then(() => {
+      const b = $("copyBtn"); b.textContent = "복사됨 ✓";
+      setTimeout(() => b.textContent = "전체 복사", 1500);
+    });
+  });
+  $("downloadBtn").addEventListener("click", () => {
+    const md = buildMarkdown();
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    a.href = url; a.download = `research_${stamp}.md`;
+    document.body.appendChild(a); a.click();
+    a.remove(); URL.revokeObjectURL(url);
+  });
+  $("resetBtn").addEventListener("click", () => {
+    $("result").classList.add("hidden");
+    $("form").classList.remove("hidden");
+    lastResult = null;
+  });
+
+  updateCanRun();
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 load_dotenv()
@@ -313,17 +314,17 @@ async def health() -> dict[str, str]:
     return {"status": "ok", "service": "tstv-ResearchMan"}
 
 
-@app.post("/research", dependencies=[Depends(verify_api_key)])
+@app.post("/research")
 async def research(body: QueryBody) -> dict[str, Any]:
     return await _do_research(body.query, body.system, body.model)
 
 
-@app.post("/analyze", dependencies=[Depends(verify_api_key)])
+@app.post("/analyze")
 async def analyze(body: QueryBody) -> dict[str, Any]:
     return await _do_analyze(body.query, body.system, body.model)
 
 
-@app.post("/brief", dependencies=[Depends(verify_api_key)])
+@app.post("/brief")
 async def brief(body: QueryBody) -> dict[str, Any]:
     return await _do_brief(body.query, body.system)
 
@@ -524,3 +525,9 @@ async def mcp_sse(request: Request):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ---------------- Static web UI (mounted last so API routes win) ----------------
+_STATIC_DIR = Path(__file__).parent / "static"
+if _STATIC_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=str(_STATIC_DIR), html=True), name="static")
