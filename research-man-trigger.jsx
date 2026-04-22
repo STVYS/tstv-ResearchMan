@@ -85,16 +85,20 @@ export default function App() {
   const [meetingTopic,  setMeetingTopic]  = useState("");
   const [meetingComment,setMeetingComment]= useState("");
   const [extraRequest,  setExtraRequest]  = useState("");
+  const [otherIndustry, setOtherIndustry] = useState("");
+  const [otherPurpose,  setOtherPurpose]  = useState("");
 
   const toggle = (arr, set, v) =>
     set(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]);
 
-  const isFindMode = !company.trim();
+  const isFindMode = company === "";
   const canRun = Boolean(
     industries.length > 0 &&
+    (!industries.includes("기타") || otherIndustry.trim().length > 0) &&
     purpose !== null &&
+    (purpose !== "기타" || otherPurpose.trim().length > 0) &&
     focus.length > 0 &&
-    (!isFindMode || (size !== null && region.length > 0)) &&
+    (isFindMode ? (size !== null && region.length > 0) : true) &&
     (purpose !== "미팅 준비" || meetingTopic.trim().length > 0)
   );
 
@@ -108,13 +112,17 @@ export default function App() {
 
   const submit = () => {
     if (!canRun) return;
+    const effectiveIndustries = industries.map(i =>
+      i === "기타" ? otherIndustry.trim() : i
+    ).filter(Boolean);
+    const effectivePurpose = purpose === "기타" ? otherPurpose.trim() : purpose;
     const msg = `[리서치맨 조사 요청]
 
 조사 대상: ${company || "(탐색 모드 — 조건에 맞는 업체 탐색)"}
 지역: ${region.length ? region.join("·") : "전체"}
-산업: ${industries.join(", ")}
+산업: ${effectiveIndustries.join(", ")}
 규모: ${size || "전체"}
-목적: ${purpose}
+목적: ${effectivePurpose}
 초점: ${focus.join(", ")}
 Perplexity 모델: ${pModel}
 Gemini 모델: ${gModel}
@@ -154,10 +162,15 @@ ${extraRequest ? `기타 요청: ${extraRequest}` : ""}
       {/* 산업 */}
       <Sec title="산업 (복수 선택)">
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {INDUSTRIES.map(i => (
+          {[...INDUSTRIES, "기타"].map(i => (
             <Tag key={i} label={i} active={industries.includes(i)} onClick={() => toggle(industries, setIndustries, i)} />
           ))}
         </div>
+        {industries.includes("기타") && (
+          <input type="text" value={otherIndustry} onChange={e => setOtherIndustry(e.target.value)}
+            placeholder="산업 직접 입력"
+            style={{ ...s.input, marginTop: 8 }} />
+        )}
       </Sec>
 
       {/* 규모 */}
@@ -171,11 +184,16 @@ ${extraRequest ? `기타 요청: ${extraRequest}` : ""}
 
       {/* 조사 목적 */}
       <Sec title="조사 목적">
-        <div style={{ display: "flex", gap: 8 }}>
-          {["시장조사", "미팅 준비", "협업 검토"].map(p => (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {["시장조사", "미팅 준비", "협업 검토", "기타"].map(p => (
             <Tag key={p} label={p} active={purpose === p} onClick={() => setPurpose(purpose === p ? null : p)} />
           ))}
         </div>
+        {purpose === "기타" && (
+          <input type="text" value={otherPurpose} onChange={e => setOtherPurpose(e.target.value)}
+            placeholder="조사 목적 직접 입력"
+            style={{ ...s.input, marginTop: 8 }} />
+        )}
       </Sec>
 
       {/* 미팅 컨텍스트 */}
