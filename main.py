@@ -371,7 +371,7 @@ _MCP_TOOLS = [
     },
     {
         "name": "research_man_ui",
-        "description": "리서치맨 조사 조건 선택 UI를 반환. Claude가 이걸 아티팩트로 렌더링함.",
+        "description": "리서치맨 조사 조건 선택 UI를 반환. Claude가 아티팩트로 렌더링함.",
         "inputSchema": _EMPTY_INPUT_SCHEMA,
     },
 ]
