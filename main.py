@@ -2,6 +2,7 @@ import asyncio
 import os
 import re
 import time
+from pathlib import Path
 from typing import Any, Optional
 
 import httpx
@@ -339,6 +340,14 @@ _TOOL_INPUT_SCHEMA = {
     "required": ["query"],
 }
 
+_EMPTY_INPUT_SCHEMA = {
+    "type": "object",
+    "properties": {},
+    "required": [],
+}
+
+_UI_FILE_PATH = Path(__file__).parent / "research-man-trigger.jsx"
+
 _MCP_TOOLS = [
     {
         "name": "research_man_search",
@@ -360,10 +369,25 @@ _MCP_TOOLS = [
         "description": "Perplexity + Gemini 병렬 실행 후 Claude가 취합/브리핑.",
         "inputSchema": _TOOL_INPUT_SCHEMA,
     },
+    {
+        "name": "research_man_ui",
+        "description": "리서치맨 조사 조건 선택 UI를 반환. Claude가 이걸 아티팩트로 렌더링함.",
+        "inputSchema": _EMPTY_INPUT_SCHEMA,
+    },
 ]
 
 
 async def _mcp_call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    if name == "research_man_ui":
+        try:
+            content = _UI_FILE_PATH.read_text(encoding="utf-8")
+            return {"content": [{"type": "text", "text": content}]}
+        except Exception as e:
+            return {
+                "content": [{"type": "text", "text": f"error reading UI file: {e}"}],
+                "isError": True,
+            }
+
     query = (arguments or {}).get("query", "")
     if not query:
         return {
