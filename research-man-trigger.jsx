@@ -90,12 +90,13 @@ export default function App() {
     set(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]);
 
   const isFindMode = !company.trim();
-  const canRun =
+  const canRun = Boolean(
     industries.length > 0 &&
     purpose !== null &&
     focus.length > 0 &&
     (!isFindMode || (size !== null && region.length > 0)) &&
-    (purpose !== "미팅 준비" || meetingTopic.trim());
+    (purpose !== "미팅 준비" || meetingTopic.trim().length > 0)
+  );
 
   const hint =
     !industries.length ? "산업을 선택해야 실행할 수 있어요" :
